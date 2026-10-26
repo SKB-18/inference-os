@@ -1,0 +1,80 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inferenceos-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - INFERENCEOS_HOST=0.0.0.0
+      - INFERENCEOS_PORT=8080
+      - INFERENCEOS_ADMIN_KEY=admin-secret-key-123
+      - INFERENCEOS_ALLOW_LOCAL_BACKENDS=true
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/inferenceos
+    depends_on:
+      - worker-fast
+      - worker-slow
+    profiles:
+      - cpu-demo
+      - default
+
+  worker-fast:
+    image: python:3.11-slim
+    container_name: inferenceos-worker-fast
+    volumes:
+      - ./stubs:/app/stubs
+    working_dir: /app/stubs
+    command: python model_stub.py --port 8001 --name worker-fast --ttft-ms 20 --tok-ms 6
+    ports:
+      - "8001:8001"
+    profiles:
+      - cpu-demo
+      - default
+
+  worker-slow:
+    image: python:3.11-slim
+    container_name: inferenceos-worker-slow
+    volumes:
+      - ./stubs:/app/stubs
+    working_dir: /app/stubs
+    command: python model_stub.py --port 8002 --name worker-slow --ttft-ms 75 --tok-ms 18
+    ports:
+      - "8002:8002"
+    profiles:
+      - cpu-demo
+      - default
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: inferenceos-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=inferenceos
+    volumes:
+      - ./src/persistence/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    profiles:
+      - cpu-demo
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: inferenceos-prometheus
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    profiles:
+      - cpu-demo
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: inferenceos-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    profiles:
+      - cpu-demo

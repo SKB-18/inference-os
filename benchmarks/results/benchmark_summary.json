@@ -1,0 +1,35 @@
+{
+  "round_robin": {
+    "policy": "round-robin",
+    "completed": 30,
+    "target_requests": 30,
+    "duration_s": 1.69,
+    "tokens_per_sec": 283.5,
+    "requests_per_min": 1063.3,
+    "ttft_p50_ms": 79.43,
+    "ttft_p90_ms": 100.9,
+    "ttft_p95_ms": 101.41,
+    "ttft_p99_ms": 102.62,
+    "backend_distribution": {
+      "worker-fast": 15,
+      "worker-slow": 15
+    }
+  },
+  "queue_aware": {
+    "policy": "estimated-queue-delay",
+    "completed": 30,
+    "target_requests": 30,
+    "duration_s": 1.16,
+    "tokens_per_sec": 413.5,
+    "requests_per_min": 1550.8,
+    "ttft_p50_ms": 41.89,
+    "ttft_p90_ms": 84.43,
+    "ttft_p95_ms": 87.42,
+    "ttft_p99_ms": 161.66,
+    "backend_distribution": {
+      "worker-fast": 27,
+      "worker-slow": 3
+    }
+  },
+  "p95_improvement_pct": 13.8
+}
