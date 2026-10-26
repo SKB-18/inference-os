@@ -42,3 +42,32 @@ impl AdmissionQueue {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_queue_permit_acquisition_and_release() {
+        let queue = AdmissionQueue::new(2, 100);
+        assert_eq!(queue.current_waiting_count(), 0);
+
+        let p1 = queue.admit().await.unwrap();
+        assert_eq!(queue.current_waiting_count(), 1);
+
+        let p2 = queue.admit().await.unwrap();
+        assert_eq!(queue.current_waiting_count(), 2);
+
+        // Queue full - next admission immediately rejected
+        assert!(queue.admit().await.is_err());
+
+        // Release permit 1
+        drop(p1);
+        assert_eq!(queue.current_waiting_count(), 1);
+
+        // Can admit again
+        let _p3 = queue.admit().await.unwrap();
+        drop(p2);
+    }
+}
+

@@ -156,3 +156,78 @@ impl BackendRegistry {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_register_backend_success() {
+        let registry = BackendRegistry::new(true);
+        let reg = BackendRegistration {
+            name: "Worker Fast".to_string(),
+            url: "http://127.0.0.1:8001".to_string(),
+            model_ids: vec!["gpt-4o-mini".to_string()],
+            concurrency_limit: 8,
+            weight: 1,
+        };
+
+        let backend = registry.register_backend(reg).unwrap();
+        assert_eq!(backend.name, "Worker Fast");
+        assert_eq!(backend.concurrency_limit, 8);
+        assert_eq!(registry.list_backends().len(), 1);
+    }
+
+    #[test]
+    fn test_ssrf_metadata_rejection() {
+        let registry = BackendRegistry::new(true);
+        assert!(registry.validate_url_ssrf("http://169.254.169.254/latest/meta-data").is_err());
+        assert!(registry.validate_url_ssrf("http://metadata.google.internal/computeMetadata").is_err());
+    }
+
+    #[test]
+    fn test_ssrf_loopback_rejection_in_prod() {
+        let prod_registry = BackendRegistry::new(false);
+        assert!(prod_registry.validate_url_ssrf("http://127.0.0.1:8001").is_err());
+        assert!(prod_registry.validate_url_ssrf("http://localhost:8001").is_err());
+    }
+
+    #[test]
+    fn test_draining_mode_rejects_inflight() {
+        let registry = BackendRegistry::new(true);
+        let reg = BackendRegistration {
+            name: "Worker Draining".to_string(),
+            url: "http://127.0.0.1:8005".to_string(),
+            model_ids: vec!["gpt-4o-mini".to_string()],
+            concurrency_limit: 4,
+            weight: 1,
+        };
+
+        let backend = registry.register_backend(reg).unwrap();
+        assert!(registry.acquire_inflight(&backend.id).is_ok());
+
+        registry.set_state(&backend.id, BackendState::Draining).unwrap();
+        assert!(registry.acquire_inflight(&backend.id).is_err());
+    }
+
+    #[test]
+    fn test_concurrency_limit_exhaustion() {
+        let registry = BackendRegistry::new(true);
+        let reg = BackendRegistration {
+            name: "Worker Small".to_string(),
+            url: "http://127.0.0.1:8006".to_string(),
+            model_ids: vec!["gpt-4o-mini".to_string()],
+            concurrency_limit: 1,
+            weight: 1,
+        };
+
+        let backend = registry.register_backend(reg).unwrap();
+        assert!(registry.acquire_inflight(&backend.id).is_ok());
+        // Second concurrent request must be rejected
+        assert!(registry.acquire_inflight(&backend.id).is_err());
+
+        registry.release_inflight(&backend.id, true, Some(45.0));
+        assert!(registry.acquire_inflight(&backend.id).is_ok());
+    }
+}
+

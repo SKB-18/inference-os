@@ -122,3 +122,42 @@ impl TenantLimiter {
         self.tenants_by_id.read().values().cloned().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tenant_authentication() {
+        let limiter = TenantLimiter::new(10_000, 5);
+        let tenant = limiter.authenticate("Bearer sk-inferenceos-demo-key").unwrap();
+        assert_eq!(tenant.id, "tenant-demo");
+
+        assert!(limiter.authenticate("Bearer invalid-key").is_err());
+    }
+
+    #[test]
+    fn test_budget_reservation_and_settlement() {
+        let limiter = TenantLimiter::new(1_000, 2);
+        let tenant = limiter.authenticate("sk-inferenceos-demo-key").unwrap();
+
+        // Reserve 200 tokens
+        assert!(limiter.reserve_budget(&tenant.id, 200).is_ok());
+
+        // Settle with 150 actual tokens
+        limiter.settle_budget(&tenant.id, 200, 150);
+
+        let updated = limiter.authenticate("sk-inferenceos-demo-key").unwrap();
+        assert_eq!(updated.tokens_used, 150);
+        assert_eq!(updated.reserved_tokens, 0);
+    }
+
+    #[test]
+    fn test_budget_exhaustion_rejection() {
+        let limiter = TenantLimiter::new(100, 5);
+        let tenant = limiter.authenticate("sk-inferenceos-demo-key").unwrap();
+
+        assert!(limiter.reserve_budget(&tenant.id, 150).is_err());
+    }
+}
+

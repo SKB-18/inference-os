@@ -63,3 +63,54 @@ impl CircuitBreaker {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_circuit_breaker_trips_to_open() {
+        let mut cb = CircuitBreaker::new(2, Duration::from_millis(50));
+        assert_eq!(cb.state, CircuitState::Closed);
+        assert!(cb.can_execute());
+
+        cb.on_failure();
+        assert_eq!(cb.state, CircuitState::Closed);
+        assert!(cb.can_execute());
+
+        cb.on_failure();
+        assert_eq!(cb.state, CircuitState::Open);
+        assert!(!cb.can_execute());
+    }
+
+    #[test]
+    fn test_circuit_breaker_half_open_recovery() {
+        let mut cb = CircuitBreaker::new(1, Duration::from_millis(10));
+        cb.on_failure();
+        assert_eq!(cb.state, CircuitState::Open);
+
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(cb.can_execute());
+        assert_eq!(cb.state, CircuitState::HalfOpen);
+
+        cb.on_success();
+        assert_eq!(cb.state, CircuitState::Closed);
+        assert_eq!(cb.consecutive_failures, 0);
+    }
+
+    #[test]
+    fn test_circuit_breaker_half_open_failure_reopens() {
+        let mut cb = CircuitBreaker::new(1, Duration::from_millis(10));
+        cb.on_failure();
+        assert_eq!(cb.state, CircuitState::Open);
+
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(cb.can_execute());
+        assert_eq!(cb.state, CircuitState::HalfOpen);
+
+        cb.on_failure();
+        assert_eq!(cb.state, CircuitState::Open);
+        assert!(!cb.can_execute());
+    }
+}
+

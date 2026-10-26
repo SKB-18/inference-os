@@ -175,3 +175,67 @@ impl Scheduler {
         hist.iter().rev().take(limit).cloned().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::BackendRegistration;
+
+    fn setup_test_scheduler() -> (Scheduler, BackendRegistry, String, String) {
+        let registry = BackendRegistry::new(true);
+        let b1 = registry.register_backend(BackendRegistration {
+            name: "Worker 1".to_string(),
+            url: "http://127.0.0.1:8001".to_string(),
+            model_ids: vec!["gpt-4o".to_string()],
+            concurrency_limit: 10,
+            weight: 1,
+        }).unwrap();
+
+        let b2 = registry.register_backend(BackendRegistration {
+            name: "Worker 2".to_string(),
+            url: "http://127.0.0.1:8002".to_string(),
+            model_ids: vec!["gpt-4o".to_string()],
+            concurrency_limit: 10,
+            weight: 1,
+        }).unwrap();
+
+        let scheduler = Scheduler::new(registry.clone());
+        (scheduler, registry, b1.id, b2.id)
+    }
+
+    #[test]
+    fn test_round_robin_selection() {
+        let (scheduler, _reg, id1, id2) = setup_test_scheduler();
+
+        let (chosen1, _) = scheduler.schedule("req-1", "t1", "gpt-4o", RoutingPolicy::RoundRobin, None).unwrap();
+        let (chosen2, _) = scheduler.schedule("req-2", "t1", "gpt-4o", RoutingPolicy::RoundRobin, None).unwrap();
+
+        // Round robin should alternatingly choose different backends
+        assert_ne!(chosen1.id, chosen2.id);
+        assert!(chosen1.id == id1 || chosen1.id == id2);
+    }
+
+    #[test]
+    fn test_least_inflight_selection() {
+        let (scheduler, reg, id1, id2) = setup_test_scheduler();
+
+        // Put inflight load on worker 1
+        reg.acquire_inflight(&id1).unwrap();
+        reg.acquire_inflight(&id1).unwrap();
+
+        // Least inflight policy must pick worker 2 with 0 inflight
+        let (chosen, _) = scheduler.schedule("req-1", "t1", "gpt-4o", RoutingPolicy::LeastInflight, None).unwrap();
+        assert_eq!(chosen.id, id2);
+    }
+
+    #[test]
+    fn test_no_healthy_backend_raises() {
+        let (scheduler, reg, id1, id2) = setup_test_scheduler();
+        reg.set_state(&id1, BackendState::Draining).unwrap();
+        reg.set_state(&id2, BackendState::Draining).unwrap();
+
+        let result = scheduler.schedule("req-1", "t1", "gpt-4o", RoutingPolicy::RoundRobin, None);
+        assert!(result.is_err());
+    }
+}
+

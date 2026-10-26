@@ -95,3 +95,62 @@ pub struct ChatCompletionChunk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<Usage>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_token_estimation_heuristics() {
+        let req = ChatCompletionRequest {
+            model: "gpt-4o-mini".to_string(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: "You are a helpful assistant.".to_string(),
+                    name: None,
+                },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: "Hello world!".to_string(),
+                    name: None,
+                },
+            ],
+            stream: false,
+            max_tokens: Some(100),
+            temperature: None,
+            top_p: None,
+            idempotency_key: None,
+            latency_tier: None,
+        };
+
+        let prompt_est = req.estimate_prompt_tokens();
+        assert!(prompt_est > 0);
+        let total_est = req.estimate_total_tokens();
+        assert_eq!(total_est, prompt_est + 100);
+    }
+
+    #[test]
+    fn test_chat_serialization_roundtrip() {
+        let req = ChatCompletionRequest {
+            model: "llama-3-8b".to_string(),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "ping".to_string(),
+                name: None,
+            }],
+            stream: true,
+            max_tokens: Some(50),
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            idempotency_key: Some("key-123".to_string()),
+            latency_tier: Some("interactive".to_string()),
+        };
+
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("llama-3-8b"));
+        let parsed: ChatCompletionRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.idempotency_key, Some("key-123".to_string()));
+    }
+}
+
