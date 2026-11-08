@@ -23,7 +23,13 @@ def run_cluster_and_gateway():
     time.sleep(1.5)
 
     # 3. Start InferenceOS gateway executable
-    exe_path = os.path.join(os.path.dirname(__file__), "..", "target", "debug", "inference-os.exe")
+    exe_name = "inference-os.exe" if sys.platform == "win32" else "inference-os"
+    exe_path = os.path.join(os.path.dirname(__file__), "..", "target", "debug", exe_name)
+    if not os.path.exists(exe_path):
+        alt_exe = "inference-os" if sys.platform == "win32" else "inference-os.exe"
+        alt_path = os.path.join(os.path.dirname(__file__), "..", "target", "debug", alt_exe)
+        if os.path.exists(alt_path):
+            exe_path = alt_path
     env = os.environ.copy()
     env["INFERENCEOS_PORT"] = str(GATEWAY_PORT)
     env["INFERENCEOS_ADMIN_KEY"] = ADMIN_KEY
