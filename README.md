@@ -1,8 +1,9 @@
 # InferenceOS: Adaptive Model Serving Gateway & Inference Control Plane
 
+[![CI](https://github.com/SKB-18/inference-os/actions/workflows/ci.yml/badge.svg)](https://github.com/SKB-18/inference-os/actions)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests: 13 Passed](https://img.shields.io/badge/Tests-13%20Passed-brightgreen.svg)]()
+[![Tests: 30 Passed](https://img.shields.io/badge/Tests-30%20Passed-brightgreen.svg)]()
 [![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-green.svg)]()
 
 > **One OpenAI-compatible endpoint that routes requests to the right local model server with predictable latency, fairness, and failure recovery.**
